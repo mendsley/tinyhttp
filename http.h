@@ -24,29 +24,46 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HTTP_HEADER_H
-#define HTTP_HEADER_H
+#ifndef HTTP_HTTP_H
+#define HTTP_HTTP_H
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
+#include <string>
+#include <vector>
+#include <unordered_map>
 
-enum http_header_status
+typedef std::vector<unsigned char> HttpBuffer;
+
+struct HttpResponse
 {
-	http_header_status_done,
-	http_header_status_continue,
-	http_header_status_version_character,
-	http_header_status_code_character,
-	http_header_status_status_character,
-	http_header_status_key_character,
-	http_header_status_value_character,
-	http_header_status_store_keyvalue
+	typedef std::unordered_map<std::string, std::string> CookieMap;
+
+	HttpBuffer body;
+	CookieMap cookies;
+	int code;
 };
 
-int http_parse_header_char(int* state, char ch);
+struct HttpRoundTripper
+{
+	enum State
+	{
+		header,
+		chunk_header,
+		chunk_data,
+		raw_data,
+		close,
+		error,
+	};
 
-#if defined(__cplusplus)
-}
-#endif
+	HttpResponse response;
+	std::string lastkey;
+	std::string lastvalue;
+	int parsestate;
+	int contentlength;
+	int state;
+	bool chunked;
+};
+
+void httpInit(HttpRoundTripper* rt);
+bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read);
 
 #endif

@@ -27,11 +27,19 @@
 #ifndef HTTP_CHUNK_H
 #define HTTP_CHUNK_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 // retuns non-zero if it needs more data
 // retuns 0 on success or error. When error: size == -1
 // On success, size = size of following chunk data
 // excluding trailing \r\n. User is expected to process
 // or otherwise seek past chunk data to the trailing \r\n
 int http_parse_chunked(int* state, int *size, char ch);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif
