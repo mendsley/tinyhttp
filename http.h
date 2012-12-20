@@ -37,28 +37,26 @@ extern "C" {
 //  body - handle HTTP response body data
 //  header - handle an HTTP header key/value pair
 //  code - handle the HTTP status code for the response
-struct http_funcs
-{
-	void* (*malloc)(int size);
-	void (*free)(void* ptr);
-	void (*body)(void* opaque, const char* data, int size);
-	void (*header)(void* opaque, const char* key, int nkey, const char* value, int nvalue);
-	void (*code)(void* opqaue, int code);
+struct http_funcs {
+    void* (*malloc)(int size);
+    void (*free)(void* ptr);
+    void (*body)(void* opaque, const char* data, int size);
+    void (*header)(void* opaque, const char* key, int nkey, const char* value, int nvalue);
+    void (*code)(void* opqaue, int code);
 };
 
-struct http_roundtripper
-{
-	struct http_funcs funcs;
-	void *opaque;
-	char *scratch;
-	int code;
-	int parsestate;
-	int contentlength;
-	int state;
-	int nscratch;
-	int nkey;
-	int nvalue;
-	int chunked;
+struct http_roundtripper {
+    struct http_funcs funcs;
+    void *opaque;
+    char *scratch;
+    int code;
+    int parsestate;
+    int contentlength;
+    int state;
+    int nscratch;
+    int nkey;
+    int nvalue;
+    int chunked;
 };
 
 // Initializes a rountripper with the specified response functions.

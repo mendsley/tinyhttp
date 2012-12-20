@@ -37,172 +37,170 @@
 
 #include "http.h"
 
-int connectsocket(const char* host, int port) {
+int connectsocket(const char* host, int port)
+{
 
-	addrinfo* result = NULL;
-	sockaddr_in addr = {0};
-	int s;
+    addrinfo* result = NULL;
+    sockaddr_in addr = {0};
+    int s;
 
-	if (getaddrinfo(host, NULL, NULL, &result))
-		goto error;
+    if (getaddrinfo(host, NULL, NULL, &result))
+        goto error;
 
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	addr.sin_addr.s_addr = INADDR_ANY;
-	for (addrinfo* ai = result; ai != NULL; ai = ai->ai_next) {
-		if (ai->ai_family != AF_INET)
-			continue;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = INADDR_ANY;
+    for (addrinfo* ai = result; ai != NULL; ai = ai->ai_next) {
+        if (ai->ai_family != AF_INET)
+            continue;
 
-		const sockaddr_in *ai_in = (const sockaddr_in*)ai->ai_addr;
-		addr.sin_addr = ai_in->sin_addr;
-		break;
-	}
+        const sockaddr_in *ai_in = (const sockaddr_in*)ai->ai_addr;
+        addr.sin_addr = ai_in->sin_addr;
+        break;
+    }
 
-	if (addr.sin_addr.s_addr == INADDR_ANY)
-		goto error;
+    if (addr.sin_addr.s_addr == INADDR_ANY)
+        goto error;
 
-	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (s == -1)
-		goto error;
+    s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (s == -1)
+        goto error;
 
-	if (connect(s, (const sockaddr*)&addr, sizeof(addr)))
-		goto error;
+    if (connect(s, (const sockaddr*)&addr, sizeof(addr)))
+        goto error;
 
-	return s;
+    return s;
 
 error:
-	if (s != -1)
-		close(s);
-	if (result)
-		freeaddrinfo(result);
-	return -1;
+    if (s != -1)
+        close(s);
+    if (result)
+        freeaddrinfo(result);
+    return -1;
 }
 
-struct HttpResponse
-{
-	typedef std::unordered_map<std::string, std::string> CookieMap;
-	typedef std::vector<char> Buffer;
+struct HttpResponse {
+    typedef std::unordered_map<std::string, std::string> CookieMap;
+    typedef std::vector<char> Buffer;
 
-	Buffer body;
-	CookieMap cookies;
-	int code;
+    Buffer body;
+    CookieMap cookies;
+    int code;
 
-	std::string lastkey;
-	std::string lastvalue;
+    std::string lastkey;
+    std::string lastvalue;
 };
 
 static void* response_malloc(int size)
 {
-	return malloc(size);
+    return malloc(size);
 }
 
 static void response_free(void* ptr)
 {
-	free(ptr);
+    free(ptr);
 }
 
 static void response_body(void* opaque, const char* data, int size)
 {
-	HttpResponse* response = (HttpResponse*)opaque;
-	response->body.insert(response->body.end(), data, data + size);
+    HttpResponse* response = (HttpResponse*)opaque;
+    response->body.insert(response->body.end(), data, data + size);
 }
 
 static void response_header(void* opaque, const char* ckey, int nkey, const char* cvalue, int nvalue)
 {
-	const std::string key(ckey, nkey);
-	const std::string value(cvalue, nvalue);
+    const std::string key(ckey, nkey);
+    const std::string value(cvalue, nvalue);
 
-	HttpResponse* response = (HttpResponse*)opaque;
-	if (key == "set-cookie")
-	{
-		const char* values = strchr(value.c_str(), '=');
-		if (values)
-		{
-			const char* params = strchr(values, ';');
-			if (!params)
-				params = value.c_str() + value.size();
+    HttpResponse* response = (HttpResponse*)opaque;
+    if (key == "set-cookie") {
+        const char* values = strchr(value.c_str(), '=');
+        if (values) {
+            const char* params = strchr(values, ';');
+            if (!params)
+                params = value.c_str() + value.size();
 
-			response->cookies.insert(
-				HttpResponse::CookieMap::value_type(
-					  std::string(value.c_str(), values)
-					, std::string(values + 1, params)
-				)
-			);
-		}
-	}
+            response->cookies.insert(
+                HttpResponse::CookieMap::value_type(
+                    std::string(value.c_str(), values)
+                    , std::string(values + 1, params)
+                )
+            );
+        }
+    }
 }
 
 static void response_code(void* opaque, int code)
 {
-	HttpResponse* response = (HttpResponse*)opaque;
-	response->code = code;
+    HttpResponse* response = (HttpResponse*)opaque;
+    response->code = code;
 }
 
-static const http_funcs responseFuncs =
-{
-	response_malloc,
-	response_free,
-	response_body,
-	response_header,
-	response_code,
+static const http_funcs responseFuncs = {
+    response_malloc,
+    response_free,
+    response_body,
+    response_header,
+    response_code,
 };
 
-int main() {
+int main()
+{
 
-	int conn = connectsocket("nothings.org", 80);
-	if (conn < 0) {
-		fprintf(stderr, "Failed to connect socket\n");
-		return -1;
-	}
+    int conn = connectsocket("nothings.org", 80);
+    if (conn < 0) {
+        fprintf(stderr, "Failed to connect socket\n");
+        return -1;
+    }
 
-	const char request[] = "GET / HTTP/1.0\r\nContent-Length: 0\r\n\r\n";
-	int len = send(conn, request, sizeof(request) - 1, 0);
-	if (len != sizeof(request) - 1) {
-		fprintf(stderr, "Failed to send request\n");
-		close(conn);
-		return -1;
-	}
+    const char request[] = "GET / HTTP/1.0\r\nContent-Length: 0\r\n\r\n";
+    int len = send(conn, request, sizeof(request) - 1, 0);
+    if (len != sizeof(request) - 1) {
+        fprintf(stderr, "Failed to send request\n");
+        close(conn);
+        return -1;
+    }
 
-	HttpResponse response;
-	response.code = 0;
+    HttpResponse response;
+    response.code = 0;
 
-	http_roundtripper rt;
-	http_init(&rt, responseFuncs, &response);
+    http_roundtripper rt;
+    http_init(&rt, responseFuncs, &response);
 
-	bool needmore = true;
-	char buffer[1024];
-	while (needmore) {
-		const char* data = buffer;
-		int ndata = recv(conn, buffer, sizeof(buffer), 0);
-		if (ndata <= 0) {
-			fprintf(stderr, "Error receiving data\n");
-			http_free(&rt);
-			close(conn);
-			return -1;
-		}
+    bool needmore = true;
+    char buffer[1024];
+    while (needmore) {
+        const char* data = buffer;
+        int ndata = recv(conn, buffer, sizeof(buffer), 0);
+        if (ndata <= 0) {
+            fprintf(stderr, "Error receiving data\n");
+            http_free(&rt);
+            close(conn);
+            return -1;
+        }
 
-		while (needmore && ndata) {
-			int read;
-			needmore = http_data(&rt, data, ndata, &read);
-			ndata -= read;
-			data += read;
-		}
-	}
+        while (needmore && ndata) {
+            int read;
+            needmore = http_data(&rt, data, ndata, &read);
+            ndata -= read;
+            data += read;
+        }
+    }
 
-	if (http_iserror(&rt)) {
-		fprintf(stderr, "Error parsing data\n");
-		http_free(&rt);
-		close(conn);
-		return -1;
-	}
+    if (http_iserror(&rt)) {
+        fprintf(stderr, "Error parsing data\n");
+        http_free(&rt);
+        close(conn);
+        return -1;
+    }
 
-	http_free(&rt);
-	close(conn);
+    http_free(&rt);
+    close(conn);
 
-	printf("Response: %d\n", response.code);
-	if (!response.body.empty()) {
-		printf("%s\n", &response.body[0]);
-	}
+    printf("Response: %d\n", response.code);
+    if (!response.body.empty()) {
+        printf("%s\n", &response.body[0]);
+    }
 
-	return 0;
+    return 0;
 }

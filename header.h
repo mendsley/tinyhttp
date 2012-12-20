@@ -33,14 +33,14 @@ extern "C" {
 
 enum http_header_status
 {
-	http_header_status_done,
-	http_header_status_continue,
-	http_header_status_version_character,
-	http_header_status_code_character,
-	http_header_status_status_character,
-	http_header_status_key_character,
-	http_header_status_value_character,
-	http_header_status_store_keyvalue
+    http_header_status_done,
+    http_header_status_continue,
+    http_header_status_version_character,
+    http_header_status_code_character,
+    http_header_status_status_character,
+    http_header_status_key_character,
+    http_header_status_value_character,
+    http_header_status_store_keyvalue
 };
 
 // Parses a single character of an HTTP header stream. The state
