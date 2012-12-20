@@ -110,7 +110,7 @@ int main() {
 		}
 	}
 
-	if (rt.state != HttpRoundTripper::close) {
+	if (httpIsError(&rt)) {
 		fprintf(stderr, "Error parsing data\n");
 		close(conn);
 		return -1;

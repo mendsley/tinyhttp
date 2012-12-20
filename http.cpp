@@ -44,13 +44,27 @@ static int min(int a, int b)
 	return a > b ? b : a;
 }
 
+namespace {
+	struct State {
+		enum Enum
+		{
+			header,
+			chunk_header,
+			chunk_data,
+			raw_data,
+			close,
+			error,
+		};
+	};
+}
+
 void httpInit(HttpRoundTripper* rt)
 {
 	rt->response.body.clear();
 	rt->response.cookies.clear();
 	rt->response.code = 0;
 	rt->parsestate = 0;
-	rt->state = HttpRoundTripper::header;
+	rt->state = State::header;
 	rt->contentlength = -1;
 	rt->chunked = false;
 }
@@ -62,23 +76,23 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 	{
 		switch (rt->state)
 		{
-		case HttpRoundTripper::header:
+		case State::header:
 			switch (http_parse_header_char(&rt->parsestate, *data))
 			{
 			case http_header_status_done:
 				if (rt->parsestate != 0)
-					rt->state = HttpRoundTripper::error;
+					rt->state = State::error;
 				else if (rt->chunked)
 				{
 					rt->contentlength = 0;
-					rt->state = HttpRoundTripper::chunk_header;
+					rt->state = State::chunk_header;
 				}
 				else if (rt->contentlength == 0)
-					rt->state = HttpRoundTripper::close;
+					rt->state = State::close;
 				else if (rt->contentlength > 0)
-					rt->state = HttpRoundTripper::raw_data;
+					rt->state = State::raw_data;
 				else
-					rt->state = HttpRoundTripper::error;
+					rt->state = State::error;
 				break;
 
 			case http_header_status_code_character:
@@ -125,22 +139,22 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 			++data;
 			break;
 
-		case HttpRoundTripper::chunk_header:
+		case State::chunk_header:
 			if (!http_parse_chunked(&rt->parsestate, &rt->contentlength, *data))
 			{
 				if (rt->contentlength == -1)
-					rt->state = HttpRoundTripper::error;
+					rt->state = State::error;
 				else if (rt->contentlength == 0)
-					rt->state = HttpRoundTripper::close;
+					rt->state = State::close;
 				else
-					rt->state = HttpRoundTripper::chunk_data;
+					rt->state = State::chunk_data;
 			}
 
 			--size;
 			++data;
 			break;
 
-		case HttpRoundTripper::chunk_data:
+		case State::chunk_data:
 			{
 				const int chunksize = min(size, rt->contentlength);
 				appendResponseData(rt, data, chunksize);
@@ -151,12 +165,12 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				if (rt->contentlength == 0)
 				{
 					rt->contentlength = 1;
-					rt->state = HttpRoundTripper::chunk_header;
+					rt->state = State::chunk_header;
 				}
 			}
 			break;
 
-		case HttpRoundTripper::raw_data:
+		case State::raw_data:
 			{
 				const int chunksize = min(size, rt->contentlength);
 				appendResponseData(rt, data, chunksize);
@@ -165,16 +179,16 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				data += chunksize;
 
 				if (rt->contentlength == 0)
-					rt->state = HttpRoundTripper::close;
+					rt->state = State::close;
 			}
 			break;
 
-		case HttpRoundTripper::close:
-		case HttpRoundTripper::error:
+		case State::close:
+		case State::error:
 			break;
 		}
 
-		if (rt->state == HttpRoundTripper::error || rt->state == HttpRoundTripper::close)
+		if (rt->state == State::error || rt->state == State::close)
 		{
 			*read = initialSize - size;
 			return false;
@@ -183,4 +197,9 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 
 	*read = initialSize - size;
 	return true;
+}
+
+bool httpIsError(HttpRoundTripper* rt)
+{
+	return rt->state == State::error;
 }

@@ -44,16 +44,6 @@ struct HttpResponse
 
 struct HttpRoundTripper
 {
-	enum State
-	{
-		header,
-		chunk_header,
-		chunk_data,
-		raw_data,
-		close,
-		error,
-	};
-
 	HttpResponse response;
 	std::string lastkey;
 	std::string lastvalue;
@@ -65,5 +55,6 @@ struct HttpRoundTripper
 
 void httpInit(HttpRoundTripper* rt);
 bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read);
+bool httpIsError(HttpRoundTripper* rt);
 
 #endif
