@@ -31,11 +31,13 @@
 extern "C" {
 #endif
 
-// retuns non-zero if it needs more data
-// retuns 0 on success or error. When error: size == -1
-// On success, size = size of following chunk data
-// excluding trailing \r\n. User is expected to process
-// or otherwise seek past chunk data to the trailing \r\n
+// Parses the size out of a chunk-encoded HTTP response. Returns
+// non-zero if it needs more data. Retuns zero success or error.
+// When error: size == -1 On success, size = size of following
+// chunk data excluding trailing \r\n. User is expected to process
+// or otherwise seek past chunk data up to the trailing \r\n. The
+// state parameter is used for internal state and should be
+// initialized to zero the first call.
 int http_parse_chunked(int* state, int *size, char ch);
 
 #if defined(__cplusplus)

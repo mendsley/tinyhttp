@@ -31,6 +31,12 @@
 extern "C" {
 #endif
 
+// Callbacks for handling response data.
+//  malloc - allocate memory, cannot fail
+//  free - free memory allocated by malloc
+//  body - handle HTTP response body data
+//  header - handle an HTTP header key/value pair
+//  code - handle the HTTP status code for the response
 struct http_funcs
 {
 	void* (*malloc)(int size);
@@ -43,8 +49,8 @@ struct http_funcs
 struct http_roundtripper
 {
 	struct http_funcs funcs;
-	char *scratch;
 	void *opaque;
+	char *scratch;
 	int code;
 	int parsestate;
 	int contentlength;
@@ -55,9 +61,22 @@ struct http_roundtripper
 	int chunked;
 };
 
+// Initializes a rountripper with the specified response functions.
+// This must be called before the rt object is used
 void http_init(struct http_roundtripper* rt, struct http_funcs, void* opaque);
+
+// Frees any scratch memory allocated during parsing.
 void http_free(struct http_roundtripper* rt);
+
+// Parses a block of HTTP response data. Returns zero if the parser
+// reached the end of the response, or an error was encountered. Use
+// http_iserror to check for the presence of an error. Returns
+// non-zero if more data is required for the response.
 int http_data(struct http_roundtripper* rt, const char* data, int size, int* read);
+
+// Returns non-zero if a completed parser encounted an error. If
+// http_data did not return non-zero, the results of this function
+// are undefined.
 int http_iserror(struct http_roundtripper* rt);
 
 #if defined(__cplusplus)
