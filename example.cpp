@@ -138,7 +138,7 @@ static void response_code(void* opaque, int code)
 	response->code = code;
 }
 
-static const HttpFuncs responseFuncs =
+static const http_funcs responseFuncs =
 {
 	response_malloc,
 	response_free,
@@ -166,8 +166,8 @@ int main() {
 	HttpResponse response;
 	response.code = 0;
 
-	HttpRoundTripper rt;
-	httpInit(&rt, responseFuncs, &response);
+	http_roundtripper rt;
+	http_init(&rt, responseFuncs, &response);
 
 	bool needmore = true;
 	char buffer[1024];
@@ -176,27 +176,27 @@ int main() {
 		int ndata = recv(conn, buffer, sizeof(buffer), 0);
 		if (ndata <= 0) {
 			fprintf(stderr, "Error receiving data\n");
-			httpFree(&rt);
+			http_free(&rt);
 			close(conn);
 			return -1;
 		}
 
 		while (needmore && ndata) {
 			int read;
-			needmore = httpHandleData(&rt, data, ndata, &read);
+			needmore = http_data(&rt, data, ndata, &read);
 			ndata -= read;
 			data += read;
 		}
 	}
 
-	if (httpIsError(&rt)) {
+	if (http_iserror(&rt)) {
 		fprintf(stderr, "Error parsing data\n");
-		httpFree(&rt);
+		http_free(&rt);
 		close(conn);
 		return -1;
 	}
 
-	httpFree(&rt);
+	http_free(&rt);
 	close(conn);
 
 	printf("Response: %d\n", response.code);

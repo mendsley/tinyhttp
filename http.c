@@ -32,12 +32,12 @@
 #include "header.h"
 #include "chunk.h"
 
-static void appendResponseData(HttpRoundTripper* rt, const char* data, int ndata)
+static void append_body(struct http_roundtripper* rt, const char* data, int ndata)
 {
 	rt->funcs.body(rt->opaque, data, ndata);
 }
 
-static void growScratch(HttpRoundTripper* rt, int size)
+static void grow_scratch(struct http_roundtripper* rt, int size)
 {
 	if (rt->nscratch >= size)
 		return;
@@ -60,21 +60,16 @@ static int min(int a, int b)
 	return a > b ? b : a;
 }
 
-namespace {
-	struct State {
-		enum Enum
-		{
-			header,
-			chunk_header,
-			chunk_data,
-			raw_data,
-			close,
-			error,
-		};
-	};
-}
+enum http_roundtripper_state {
+	http_roundtripper_header,
+	http_roundtripper_chunk_header,
+	http_roundtripper_chunk_data,
+	http_roundtripper_raw_data,
+	http_roundtripper_close,
+	http_roundtripper_error,
+};
 
-void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque)
+void http_init(struct http_roundtripper* rt, struct http_funcs funcs, void* opaque)
 {
 	rt->funcs = funcs;
 	rt->scratch = 0;
@@ -82,14 +77,14 @@ void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque)
 	rt->code = 0;
 	rt->parsestate = 0;
 	rt->contentlength = -1;
-	rt->state = State::header;
+	rt->state = http_roundtripper_header;
 	rt->nscratch = 0;
 	rt->nkey = 0;
 	rt->nvalue = 0;
-	rt->chunked = false;
+	rt->chunked = 0;
 }
 
-void httpFree(HttpRoundTripper* rt)
+void http_free(struct http_roundtripper* rt)
 {
 	if (rt->scratch)
 	{
@@ -98,31 +93,31 @@ void httpFree(HttpRoundTripper* rt)
 	}
 }
 
-bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
+int http_data(struct http_roundtripper* rt, const char* data, int size, int* read)
 {
-	const int initialSize = size;
+	const int initial_size = size;
 	while (size)
 	{
 		switch (rt->state)
 		{
-		case State::header:
+		case http_roundtripper_header:
 			switch (http_parse_header_char(&rt->parsestate, *data))
 			{
 			case http_header_status_done:
 				rt->funcs.code(rt->opaque, rt->code);
 				if (rt->parsestate != 0)
-					rt->state = State::error;
+					rt->state = http_roundtripper_error;
 				else if (rt->chunked)
 				{
 					rt->contentlength = 0;
-					rt->state = State::chunk_header;
+					rt->state = http_roundtripper_chunk_header;
 				}
 				else if (rt->contentlength == 0)
-					rt->state = State::close;
+					rt->state = http_roundtripper_close;
 				else if (rt->contentlength > 0)
-					rt->state = State::raw_data;
+					rt->state = http_roundtripper_raw_data;
 				else
-					rt->state = State::error;
+					rt->state = http_roundtripper_error;
 				break;
 
 			case http_header_status_code_character:
@@ -130,13 +125,13 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				break;
 
 			case http_header_status_key_character:
-				growScratch(rt, rt->nkey + 1);
+				grow_scratch(rt, rt->nkey + 1);
 				rt->scratch[rt->nkey] = tolower(*data);
 				++rt->nkey;
 				break;
 
 			case http_header_status_value_character:
-				growScratch(rt, rt->nkey + rt->nvalue + 1);
+				grow_scratch(rt, rt->nkey + rt->nvalue + 1);
 				rt->scratch[rt->nkey+rt->nvalue] = *data;
 				++rt->nvalue;
 				break;
@@ -145,8 +140,9 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				if (rt->nkey == 17 && 0 == strncmp(rt->scratch, "transfer-encoding", rt->nkey))
 					rt->chunked = (rt->nvalue == 7 && 0 == strncmp(rt->scratch + rt->nkey, "chunked", rt->nvalue));
 				else if (rt->nkey == 14 && 0 == strncmp(rt->scratch, "content-length", rt->nkey)) {
+					int ii, end;
 					rt->contentlength = 0;
-					for (int ii = rt->nkey, end = rt->nkey + rt->nvalue; ii != end; ++ii)
+					for (ii = rt->nkey, end = rt->nkey + rt->nvalue; ii != end; ++ii)
 						rt->contentlength = rt->contentlength * 10 + rt->scratch[ii] - '0';
 				}
 
@@ -161,25 +157,25 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 			++data;
 			break;
 
-		case State::chunk_header:
+		case http_roundtripper_chunk_header:
 			if (!http_parse_chunked(&rt->parsestate, &rt->contentlength, *data))
 			{
 				if (rt->contentlength == -1)
-					rt->state = State::error;
+					rt->state = http_roundtripper_error;
 				else if (rt->contentlength == 0)
-					rt->state = State::close;
+					rt->state = http_roundtripper_close;
 				else
-					rt->state = State::chunk_data;
+					rt->state = http_roundtripper_chunk_data;
 			}
 
 			--size;
 			++data;
 			break;
 
-		case State::chunk_data:
+		case http_roundtripper_chunk_data:
 			{
 				const int chunksize = min(size, rt->contentlength);
-				appendResponseData(rt, data, chunksize);
+				append_body(rt, data, chunksize);
 				rt->contentlength -= chunksize;
 				size -= chunksize;
 				data += chunksize;
@@ -187,46 +183,46 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				if (rt->contentlength == 0)
 				{
 					rt->contentlength = 1;
-					rt->state = State::chunk_header;
+					rt->state = http_roundtripper_chunk_header;
 				}
 			}
 			break;
 
-		case State::raw_data:
+		case http_roundtripper_raw_data:
 			{
 				const int chunksize = min(size, rt->contentlength);
-				appendResponseData(rt, data, chunksize);
+				append_body(rt, data, chunksize);
 				rt->contentlength -= chunksize;
 				size -= chunksize;
 				data += chunksize;
 
 				if (rt->contentlength == 0)
-					rt->state = State::close;
+					rt->state = http_roundtripper_close;
 			}
 			break;
 
-		case State::close:
-		case State::error:
+		case http_roundtripper_close:
+		case http_roundtripper_error:
 			break;
 		}
 
-		if (rt->state == State::error || rt->state == State::close)
+		if (rt->state == http_roundtripper_error || rt->state == http_roundtripper_close)
 		{
 			if (rt->scratch)
 			{
 				rt->funcs.free(rt->scratch);
 				rt->scratch = 0;
 			}
-			*read = initialSize - size;
-			return false;
+			*read = initial_size - size;
+			return 0;
 		}
 	}
 
-	*read = initialSize - size;
-	return true;
+	*read = initial_size - size;
+	return 1;
 }
 
-bool httpIsError(HttpRoundTripper* rt)
+int http_iserror(struct http_roundtripper* rt)
 {
-	return rt->state == State::error;
+	return rt->state == http_roundtripper_error;
 }

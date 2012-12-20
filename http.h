@@ -27,7 +27,11 @@
 #ifndef HTTP_HTTP_H
 #define HTTP_HTTP_H
 
-struct HttpFuncs
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+struct http_funcs
 {
 	void* (*malloc)(int size);
 	void (*free)(void* ptr);
@@ -36,9 +40,9 @@ struct HttpFuncs
 	void (*code)(void* opqaue, int code);
 };
 
-struct HttpRoundTripper
+struct http_roundtripper
 {
-	HttpFuncs funcs;
+	struct http_funcs funcs;
 	char *scratch;
 	void *opaque;
 	int code;
@@ -48,12 +52,16 @@ struct HttpRoundTripper
 	int nscratch;
 	int nkey;
 	int nvalue;
-	bool chunked;
+	int chunked;
 };
 
-void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque);
-void httpFree(HttpRoundTripper* rt);
-bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read);
-bool httpIsError(HttpRoundTripper* rt);
+void http_init(struct http_roundtripper* rt, struct http_funcs, void* opaque);
+void http_free(struct http_roundtripper* rt);
+int http_data(struct http_roundtripper* rt, const char* data, int size, int* read);
+int http_iserror(struct http_roundtripper* rt);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif
