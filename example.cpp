@@ -91,6 +91,16 @@ struct HttpResponse
 	std::string lastvalue;
 };
 
+static void* response_malloc(int size)
+{
+	return malloc(size);
+}
+
+static void response_free(void* ptr)
+{
+	free(ptr);
+}
+
 static void response_body(void* opaque, const char* data, int size)
 {
 	HttpResponse* response = (HttpResponse*)opaque;
@@ -130,6 +140,8 @@ static void response_code(void* opaque, int code)
 
 static const HttpFuncs responseFuncs =
 {
+	response_malloc,
+	response_free,
 	response_body,
 	response_header,
 	response_code,
@@ -164,6 +176,7 @@ int main() {
 		int ndata = recv(conn, buffer, sizeof(buffer), 0);
 		if (ndata <= 0) {
 			fprintf(stderr, "Error receiving data\n");
+			httpFree(&rt);
 			close(conn);
 			return -1;
 		}
@@ -178,15 +191,18 @@ int main() {
 
 	if (httpIsError(&rt)) {
 		fprintf(stderr, "Error parsing data\n");
+		httpFree(&rt);
 		close(conn);
 		return -1;
 	}
+
+	httpFree(&rt);
+	close(conn);
 
 	printf("Response: %d\n", response.code);
 	if (!response.body.empty()) {
 		printf("%s\n", &response.body[0]);
 	}
 
-	close(conn);
 	return 0;
 }

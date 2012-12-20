@@ -27,10 +27,10 @@
 #ifndef HTTP_HTTP_H
 #define HTTP_HTTP_H
 
-#include <string>
-
 struct HttpFuncs
 {
+	void* (*malloc)(int size);
+	void (*free)(void* ptr);
 	void (*body)(void* opaque, const char* data, int size);
 	void (*header)(void* opaque, const char* key, int nkey, const char* value, int nvalue);
 	void (*code)(void* opqaue, int code);
@@ -38,17 +38,21 @@ struct HttpFuncs
 
 struct HttpRoundTripper
 {
-	std::string lastkey, lastvalue; //TODO - move these out of RT
 	HttpFuncs funcs;
+	char *scratch;
 	void *opaque;
 	int code;
 	int parsestate;
 	int contentlength;
 	int state;
+	int nscratch;
+	int nkey;
+	int nvalue;
 	bool chunked;
 };
 
 void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque);
+void httpFree(HttpRoundTripper* rt);
 bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read);
 bool httpIsError(HttpRoundTripper* rt);
 

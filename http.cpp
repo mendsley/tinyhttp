@@ -27,7 +27,6 @@
 #include "http.h"
 
 #include <ctype.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "header.h"
@@ -36,6 +35,24 @@
 static void appendResponseData(HttpRoundTripper* rt, const char* data, int ndata)
 {
 	rt->funcs.body(rt->opaque, data, ndata);
+}
+
+static void growScratch(HttpRoundTripper* rt, int size)
+{
+	if (rt->nscratch >= size)
+		return;
+
+	if (size < 64)
+		size = 64;
+	int nsize = (rt->nscratch * 3) / 2;
+	if (nsize < size)
+		nsize = size;
+
+	char *newscratch = (char*)rt->funcs.malloc(nsize);
+	memcpy(newscratch, rt->scratch, rt->nscratch);
+	rt->funcs.free(rt->scratch);
+	rt->scratch = newscratch;
+	rt->nscratch = nsize;
 }
 
 static int min(int a, int b)
@@ -60,12 +77,25 @@ namespace {
 void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque)
 {
 	rt->funcs = funcs;
-	rt->code = 0;
+	rt->scratch = 0;
 	rt->opaque = opaque;
+	rt->code = 0;
 	rt->parsestate = 0;
-	rt->state = State::header;
 	rt->contentlength = -1;
+	rt->state = State::header;
+	rt->nscratch = 0;
+	rt->nkey = 0;
+	rt->nvalue = 0;
 	rt->chunked = false;
+}
+
+void httpFree(HttpRoundTripper* rt)
+{
+	if (rt->scratch)
+	{
+		rt->funcs.free(rt->scratch);
+		rt->scratch = 0;
+	}
 }
 
 bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
@@ -100,22 +130,30 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				break;
 
 			case http_header_status_key_character:
-				rt->lastkey.push_back(tolower(*data));
+				growScratch(rt, rt->nkey + 1);
+				rt->scratch[rt->nkey] = tolower(*data);
+				++rt->nkey;
 				break;
 
 			case http_header_status_value_character:
-				rt->lastvalue.push_back(tolower(*data));
+				growScratch(rt, rt->nkey + rt->nvalue + 1);
+				rt->scratch[rt->nkey+rt->nvalue] = *data;
+				++rt->nvalue;
 				break;
 
 			case http_header_status_store_keyvalue:
-				if (rt->lastkey == "transfer-encoding")
-					rt->chunked = (rt->lastvalue == "chunked");
-				else if (rt->lastkey == "content-length")
-					rt->contentlength = atoi(rt->lastvalue.c_str());
+				if (rt->nkey == 17 && 0 == strncmp(rt->scratch, "transfer-encoding", rt->nkey))
+					rt->chunked = (rt->nvalue == 7 && 0 == strncmp(rt->scratch + rt->nkey, "chunked", rt->nvalue));
+				else if (rt->nkey == 14 && 0 == strncmp(rt->scratch, "content-length", rt->nkey)) {
+					rt->contentlength = 0;
+					for (int ii = rt->nkey, end = rt->nkey + rt->nvalue; ii != end; ++ii)
+						rt->contentlength = rt->contentlength * 10 + rt->scratch[ii] - '0';
+				}
 
-				rt->funcs.header(rt->opaque, rt->lastkey.c_str(), (int)rt->lastkey.size(), rt->lastvalue.c_str(), (int)rt->lastvalue.size());
-				rt->lastkey.clear();
-				rt->lastvalue.clear();
+				rt->funcs.header(rt->opaque, rt->scratch, rt->nkey, rt->scratch + rt->nkey, rt->nvalue);
+
+				rt->nkey = 0;
+				rt->nvalue = 0;
 				break;
 			}
 
@@ -174,6 +212,11 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 
 		if (rt->state == State::error || rt->state == State::close)
 		{
+			if (rt->scratch)
+			{
+				rt->funcs.free(rt->scratch);
+				rt->scratch = 0;
+			}
 			*read = initialSize - size;
 			return false;
 		}
