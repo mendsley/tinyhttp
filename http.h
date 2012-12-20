@@ -32,14 +32,14 @@ extern "C" {
 #endif
 
 // Callbacks for handling response data.
-//  malloc - allocate memory, cannot fail
-//  free - free memory allocated by malloc
+//  realloc_scratch - reallocate memory, cannot fail. There will only
+//                    be one scratch buffer. Implemnentation may take
+//                    advantage of this fact.
 //  body - handle HTTP response body data
 //  header - handle an HTTP header key/value pair
 //  code - handle the HTTP status code for the response
 struct http_funcs {
-    void* (*malloc)(int size);
-    void (*free)(void* ptr);
+    void* (*realloc_scratch)(void* ptr, int size);
     void (*body)(void* opaque, const char* data, int size);
     void (*header)(void* opaque, const char* key, int nkey, const char* value, int nvalue);
     void (*code)(void* opqaue, int code);

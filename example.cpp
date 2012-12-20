@@ -91,14 +91,9 @@ struct HttpResponse {
     std::string lastvalue;
 };
 
-static void* response_malloc(int size)
+static void* response_realloc(void* ptr, int size)
 {
-    return malloc(size);
-}
-
-static void response_free(void* ptr)
-{
-    free(ptr);
+    return realloc(ptr, size);
 }
 
 static void response_body(void* opaque, const char* data, int size)
@@ -137,8 +132,7 @@ static void response_code(void* opaque, int code)
 }
 
 static const http_funcs responseFuncs = {
-    response_malloc,
-    response_free,
+    response_realloc,
     response_body,
     response_header,
     response_code,

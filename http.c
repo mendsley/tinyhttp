@@ -48,10 +48,7 @@ static void grow_scratch(struct http_roundtripper* rt, int size)
     if (nsize < size)
         nsize = size;
 
-    char *newscratch = (char*)rt->funcs.malloc(nsize);
-    memcpy(newscratch, rt->scratch, rt->nscratch);
-    rt->funcs.free(rt->scratch);
-    rt->scratch = newscratch;
+	rt->scratch = rt->funcs.realloc_scratch(rt->scratch, nsize);
     rt->nscratch = nsize;
 }
 
@@ -87,7 +84,7 @@ void http_init(struct http_roundtripper* rt, struct http_funcs funcs, void* opaq
 void http_free(struct http_roundtripper* rt)
 {
     if (rt->scratch) {
-        rt->funcs.free(rt->scratch);
+        rt->funcs.realloc_scratch(rt->scratch, 0);
         rt->scratch = 0;
     }
 }
@@ -198,7 +195,7 @@ int http_data(struct http_roundtripper* rt, const char* data, int size, int* rea
 
         if (rt->state == http_roundtripper_error || rt->state == http_roundtripper_close) {
             if (rt->scratch) {
-                rt->funcs.free(rt->scratch);
+                rt->funcs.realloc_scratch(rt->scratch, 0);
                 rt->scratch = 0;
             }
             *read = initial_size - size;
