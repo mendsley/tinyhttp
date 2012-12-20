@@ -41,7 +41,7 @@ extern "C" {
  *  code - handle the HTTP status code for the response
  */
 struct http_funcs {
-    void* (*realloc_scratch)(void* ptr, int size);
+    void* (*realloc_scratch)(void* opaque, void* ptr, int size);
     void (*body)(void* opaque, const char* data, int size);
     void (*header)(void* opaque, const char* key, int nkey, const char* value, int nvalue);
     void (*code)(void* opqaue, int code);

@@ -91,7 +91,7 @@ struct HttpResponse {
     std::string lastvalue;
 };
 
-static void* response_realloc(void* ptr, int size)
+static void* response_realloc(void* opaque, void* ptr, int size)
 {
     return realloc(ptr, size);
 }
