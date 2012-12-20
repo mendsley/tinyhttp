@@ -24,7 +24,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string>
+#include <vector>
+#include <unordered_map>
+
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -72,6 +78,63 @@ error:
 	return -1;
 }
 
+struct HttpResponse
+{
+	typedef std::unordered_map<std::string, std::string> CookieMap;
+	typedef std::vector<char> Buffer;
+
+	Buffer body;
+	CookieMap cookies;
+	int code;
+
+	std::string lastkey;
+	std::string lastvalue;
+};
+
+static void response_body(void* opaque, const char* data, int size)
+{
+	HttpResponse* response = (HttpResponse*)opaque;
+	response->body.insert(response->body.end(), data, data + size);
+}
+
+static void response_header(void* opaque, const char* ckey, int nkey, const char* cvalue, int nvalue)
+{
+	const std::string key(ckey, nkey);
+	const std::string value(cvalue, nvalue);
+
+	HttpResponse* response = (HttpResponse*)opaque;
+	if (key == "set-cookie")
+	{
+		const char* values = strchr(value.c_str(), '=');
+		if (values)
+		{
+			const char* params = strchr(values, ';');
+			if (!params)
+				params = value.c_str() + value.size();
+
+			response->cookies.insert(
+				HttpResponse::CookieMap::value_type(
+					  std::string(value.c_str(), values)
+					, std::string(values + 1, params)
+				)
+			);
+		}
+	}
+}
+
+static void response_code(void* opaque, int code)
+{
+	HttpResponse* response = (HttpResponse*)opaque;
+	response->code = code;
+}
+
+static const HttpFuncs responseFuncs =
+{
+	response_body,
+	response_header,
+	response_code,
+};
+
 int main() {
 
 	int conn = connectsocket("nothings.org", 80);
@@ -88,8 +151,11 @@ int main() {
 		return -1;
 	}
 
+	HttpResponse response;
+	response.code = 0;
+
 	HttpRoundTripper rt;
-	httpInit(&rt);
+	httpInit(&rt, responseFuncs, &response);
 
 	bool needmore = true;
 	char buffer[1024];
@@ -116,9 +182,9 @@ int main() {
 		return -1;
 	}
 
-	printf("Response: %d\n", rt.response.code);
-	if (!rt.response.body.empty()) {
-		printf("%s\n", &rt.response.body[0]);
+	printf("Response: %d\n", response.code);
+	if (!response.body.empty()) {
+		printf("%s\n", &response.body[0]);
 	}
 
 	close(conn);

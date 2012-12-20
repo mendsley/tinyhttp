@@ -33,10 +33,9 @@
 #include "header.h"
 #include "chunk.h"
 
-static void appendResponseData(HttpRoundTripper* rt, const void* data, int ndata)
+static void appendResponseData(HttpRoundTripper* rt, const char* data, int ndata)
 {
-	HttpBuffer* b = &rt->response.body;
-	b->insert(b->end(), (const unsigned char*)data, (const unsigned char*)data + ndata);
+	rt->funcs.body(rt->opaque, data, ndata);
 }
 
 static int min(int a, int b)
@@ -58,11 +57,11 @@ namespace {
 	};
 }
 
-void httpInit(HttpRoundTripper* rt)
+void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque)
 {
-	rt->response.body.clear();
-	rt->response.cookies.clear();
-	rt->response.code = 0;
+	rt->funcs = funcs;
+	rt->code = 0;
+	rt->opaque = opaque;
 	rt->parsestate = 0;
 	rt->state = State::header;
 	rt->contentlength = -1;
@@ -80,6 +79,7 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 			switch (http_parse_header_char(&rt->parsestate, *data))
 			{
 			case http_header_status_done:
+				rt->funcs.code(rt->opaque, rt->code);
 				if (rt->parsestate != 0)
 					rt->state = State::error;
 				else if (rt->chunked)
@@ -96,7 +96,7 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 				break;
 
 			case http_header_status_code_character:
-				rt->response.code = rt->response.code * 10 + *data - '0';
+				rt->code = rt->code * 10 + *data - '0';
 				break;
 
 			case http_header_status_key_character:
@@ -112,24 +112,8 @@ bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read)
 					rt->chunked = (rt->lastvalue == "chunked");
 				else if (rt->lastkey == "content-length")
 					rt->contentlength = atoi(rt->lastvalue.c_str());
-				else if (rt->lastkey == "set-cookie")
-				{
-					const char* values = strchr(rt->lastvalue.c_str(), '=');
-					if (values)
-					{
-						const char* params = strchr(values, ';');
-						if (!params)
-							params = rt->lastvalue.c_str() + rt->lastvalue.size();
 
-						rt->response.cookies.insert(
-							HttpResponse::CookieMap::value_type(
-								  std::string(rt->lastvalue.c_str(), values)
-								, std::string(values + 1, params)
-							)
-						);
-					}
-				}
-
+				rt->funcs.header(rt->opaque, rt->lastkey.c_str(), (int)rt->lastkey.size(), rt->lastvalue.c_str(), (int)rt->lastvalue.size());
 				rt->lastkey.clear();
 				rt->lastvalue.clear();
 				break;

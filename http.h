@@ -28,32 +28,27 @@
 #define HTTP_HTTP_H
 
 #include <string>
-#include <vector>
-#include <unordered_map>
 
-typedef std::vector<unsigned char> HttpBuffer;
-
-struct HttpResponse
+struct HttpFuncs
 {
-	typedef std::unordered_map<std::string, std::string> CookieMap;
-
-	HttpBuffer body;
-	CookieMap cookies;
-	int code;
+	void (*body)(void* opaque, const char* data, int size);
+	void (*header)(void* opaque, const char* key, int nkey, const char* value, int nvalue);
+	void (*code)(void* opqaue, int code);
 };
 
 struct HttpRoundTripper
 {
-	HttpResponse response;
-	std::string lastkey;
-	std::string lastvalue;
+	std::string lastkey, lastvalue; //TODO - move these out of RT
+	HttpFuncs funcs;
+	void *opaque;
+	int code;
 	int parsestate;
 	int contentlength;
 	int state;
 	bool chunked;
 };
 
-void httpInit(HttpRoundTripper* rt);
+void httpInit(HttpRoundTripper* rt, HttpFuncs funcs, void* opaque);
 bool httpHandleData(HttpRoundTripper* rt, const char* data, int size, int* read);
 bool httpIsError(HttpRoundTripper* rt);
 
