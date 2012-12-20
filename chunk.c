@@ -25,12 +25,12 @@
  */
 
 static const unsigned char http_chunk_state[] = {
-//     *    LF    CR    HEX
-    0xC1, 0xC1, 0xC1,    1, // s0: initial hex char
-    0xC1, 0xC1,    2, 0x81, // s1: additional hex chars, followed by CR
-    0xC1, 0x83, 0xC1, 0xC1, // s2: trailing LF
-    0xC1, 0xC1,    4, 0xC1, // s3: CR after chunk block
-    0xC1, 0xC0, 0xC1, 0xC1, // s4: LF after chunk block
+/*     *    LF    CR    HEX */
+    0xC1, 0xC1, 0xC1,    1, /* s0: initial hex char */
+    0xC1, 0xC1,    2, 0x81, /* s1: additional hex chars, followed by CR */
+    0xC1, 0x83, 0xC1, 0xC1, /* s2: trailing LF */
+    0xC1, 0xC1,    4, 0xC1, /* s3: CR after chunk block */
+    0xC1, 0xC0, 0xC1, 0xC1, /* s4: LF after chunk block */
 };
 
 int http_parse_chunked(int* state, int *size, char ch)
@@ -54,14 +54,14 @@ int http_parse_chunked(int* state, int *size, char ch)
     case 0xC0:
         return *size != 0;
 
-    case 0xC1: // error
+    case 0xC1: /* error */
         *size = -1;
         return 0;
 
-    case 0x01: // initial char
+    case 0x01: /* initial char */
         *size = 0;
-        // fallthrough
-    case 0x81: // size char
+        /* fallthrough */
+    case 0x81: /* size char */
         if (ch >= 'a')
             *size = *size * 16 + (ch - 'a' + 10);
         else if (ch >= 'A')
