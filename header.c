@@ -24,6 +24,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "header.h"
+
 static unsigned char http_header_state[] = {
 /*     *    \t    \n   \r    ' '     ,     :   PAD */
     0x80,    1, 0xC1, 0xC1,    1, 0x80, 0x80, 0xC1, /* state 0: HTTP version */
@@ -37,17 +39,6 @@ static unsigned char http_header_state[] = {
     0x87, 0x88,    6,    9, 0x88, 0x88, 0x87, 0xC1, /* state 8: Split value field value */
     0xC1, 0xC1,    6, 0xC1, 0xC1, 0xC1, 0xC1, 0xC1, /* state 9: CR after split value field */
     0xC1, 0xC1, 0xC4, 0xC1, 0xC1, 0xC1, 0xC1, 0xC1, /* state 10:CR after header value */
-};
-
-enum http_header_status {
-    http_header_status_done,
-    http_header_status_continue,
-    http_header_status_version_character,
-    http_header_status_code_character,
-    http_header_status_status_character,
-    http_header_status_key_character,
-    http_header_status_value_character,
-    http_header_status_store_keyvalue
 };
 
 int http_parse_header_char(int* state, char ch)
