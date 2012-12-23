@@ -24,9 +24,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+/*
+Compiling example:
+$ g++ -o example example.cpp
+*/
+
 #include <string>
 #include <vector>
-#include <unordered_map>
 
 #include <stdio.h>
 #include <string.h>
@@ -37,6 +42,14 @@
 
 #include "http.h"
 
+// directly embed the source here
+extern "C" {
+	#include "http.c"
+	#include "header.c"
+	#include "chunk.c"
+}
+
+// return a socket connected to a hostname, or -1
 int connectsocket(const char* host, int port)
 {
 
@@ -79,16 +92,10 @@ error:
     return -1;
 }
 
+// Response data/funcs
 struct HttpResponse {
-    typedef std::unordered_map<std::string, std::string> CookieMap;
-    typedef std::vector<char> Buffer;
-
-    Buffer body;
-    CookieMap cookies;
+	std::vector<char> body;
     int code;
-
-    std::string lastkey;
-    std::string lastvalue;
 };
 
 static void* response_realloc(void* opaque, void* ptr, int size)
@@ -103,27 +110,7 @@ static void response_body(void* opaque, const char* data, int size)
 }
 
 static void response_header(void* opaque, const char* ckey, int nkey, const char* cvalue, int nvalue)
-{
-    const std::string key(ckey, nkey);
-    const std::string value(cvalue, nvalue);
-
-    HttpResponse* response = (HttpResponse*)opaque;
-    if (key == "set-cookie") {
-        const char* values = strchr(value.c_str(), '=');
-        if (values) {
-            const char* params = strchr(values, ';');
-            if (!params)
-                params = value.c_str() + value.size();
-
-            response->cookies.insert(
-                HttpResponse::CookieMap::value_type(
-                    std::string(value.c_str(), values)
-                    , std::string(values + 1, params)
-                )
-            );
-        }
-    }
-}
+{ /* example doesn't care about headers */ }
 
 static void response_code(void* opaque, int code)
 {
