@@ -5,6 +5,8 @@ itself is only dependent on:
 * `<ctype.h> - tolower`
 * `<string.h> - memcpy`
 
+For more information please see my blog post at: <http://mendsley.github.com/2012/12/19/tinyhttp.html>
+
 [![Build Status](https://api.travis-ci.org/mendsley/tinyhttp.png)](http://travis-ci.org/mendsley/tinyhttp)
 
 Contact
