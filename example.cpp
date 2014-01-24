@@ -73,6 +73,8 @@ int connectsocket(const char* host, int port)
         break;
     }
 
+    freeaddrinfo(result);
+
     if (addr.sin_addr.s_addr == INADDR_ANY)
         goto error;
 
