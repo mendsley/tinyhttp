@@ -62,6 +62,7 @@ enum http_roundtripper_state {
     http_roundtripper_chunk_header,
     http_roundtripper_chunk_data,
     http_roundtripper_raw_data,
+    http_roundtripper_unknown_data,
     http_roundtripper_close,
     http_roundtripper_error,
 };
@@ -107,6 +108,8 @@ int http_data(struct http_roundtripper* rt, const char* data, int size, int* rea
                     rt->state = http_roundtripper_close;
                 else if (rt->contentlength > 0)
                     rt->state = http_roundtripper_raw_data;
+                else if (rt->contentlength == -1)
+                    rt->state = http_roundtripper_unknown_data;
                 else
                     rt->state = http_roundtripper_error;
                 break;
@@ -185,6 +188,17 @@ int http_data(struct http_roundtripper* rt, const char* data, int size, int* rea
 
             if (rt->contentlength == 0)
                 rt->state = http_roundtripper_close;
+        }
+        break;
+
+        case http_roundtripper_unknown_data: {
+            if (size == 0)
+                rt->state = http_roundtripper_close;
+            else {
+                append_body(rt, data, size);
+                size -= size;
+                data += size;
+            }
         }
         break;
 
